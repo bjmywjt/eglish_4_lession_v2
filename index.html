@@ -291,7 +291,7 @@ function renderArticle(){
    let en=s[0];
    if(currentStep===1) en="";
    return `<div class="sentence">
-     <div class="sentenceTop"><span class="badge">句 ${i+1}${isDone?" · 已掌握":""}</span><button class="sound" onclick="speak(${JSON.stringify(s[0])})">▶</button></div>
+     <div class="sentenceTop"><span class="badge">句 ${i+1}${isDone?" · 已掌握":""}</span><button class="sound" onclick="speak(decodeURIComponent('${encodeURIComponent(s[0])}'))">▶</button></div>
      ${showCn?`<div class="cn">${s[1]}</div>`:""}
      ${showEn?`<div class="en">${en}</div>`:""}
      ${mask?`<div class="en masked">${s[0]}</div>`:""}
@@ -313,7 +313,36 @@ function nextStep(){
 function markDone(i){state.done[key(currentArticle,i)]=true;save();renderArticle();renderHome()}
 function markRetry(i){state.retry[key(currentArticle,i)]=(state.retry[key(currentArticle,i)]||0)+1;state.done[key(currentArticle,i)]=false;save();renderArticle();renderHome()}
 function speak(t){
- try{speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(t);u.lang="en-US";u.rate=.82;speechSynthesis.speak(u)}catch(e){}
+  try{
+    if(!("speechSynthesis" in window)){ alert("当前浏览器不支持英文朗读，请使用最新版 Chrome 或 Safari。"); return; }
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = "en-US";
+    u.rate = 0.82;
+    u.pitch = 1;
+    const voices = speechSynthesis.getVoices();
+    const voice = voices.find(v => /^en(-|_)/i.test(v.lang) && /Google|Microsoft|Samantha|Alex|Daniel|Karen|English/i.test(v.name))
+               || voices.find(v => /^en(-|_)/i.test(v.lang));
+    if(voice) u.voice = voice;
+    u.onerror = () => alert("朗读启动失败，请检查设备音量/静音开关，或换 Chrome / Safari 重试。");
+    speechSynthesis.speak(u);
+    // Some browsers populate voices asynchronously.
+    if(!voice && voices.length === 0){
+      setTimeout(() => {
+        speechSynthesis.cancel();
+        const vs = speechSynthesis.getVoices();
+        const v2 = vs.find(v => /^en(-|_)/i.test(v.lang));
+        if(v2) u.voice = v2;
+        speechSynthesis.speak(u);
+      }, 100);
+    }
+  }catch(e){
+    alert("朗读启动失败：" + e.message);
+  }
+}
+if("speechSynthesis" in window){
+  speechSynthesis.getVoices();
+  speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
 }
 function startRandom(){openArticle(Math.floor(Math.random()*articles.length),1)}
 function showReview(){
